@@ -1,0 +1,209 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 3,
+      "number_of_replicas": 1,
+      "refresh_interval": "2s",
+      "routing": {
+        "allocation": {
+          "total_shards_per_node": 2
+        }
+      },
+      "mapping": {
+        "total_fields": {
+          "limit": 2000
+        }
+      }
+    },
+    "analysis": {
+      "analyzer": {
+        "search_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "stop",
+            "snowball",
+            "edge_ngram_filter"
+          ]
+        },
+        "exact_analyzer": {
+          "type": "custom",
+          "tokenizer": "keyword",
+          "filter": ["lowercase", "trim"]
+        }
+      },
+      "filter": {
+        "edge_ngram_filter": {
+          "type": "edge_ngram",
+          "min_gram": 2,
+          "max_gram": 10
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "tenant_id": {
+        "type": "keyword",
+        "index": true
+      },
+      "id": {
+        "type": "keyword",
+        "index": false
+      },
+      "entity": {
+        "type": "keyword",
+        "index": true
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "search_analyzer",
+        "fields": {
+          "exact": {
+            "type": "keyword",
+            "index": true,
+            "normalizer": "lowercase"
+          },
+          "suggest": {
+            "type": "completion",
+            "analyzer": "exact_analyzer",
+            "preserve_separators": true,
+            "preserve_position_increments": true,
+            "max_input_length": 50
+          }
+        }
+      },
+      "body": {
+        "type": "text",
+        "analyzer": "search_analyzer",
+        "index_options": "positions",
+        "term_vector": "with_positions_offsets"
+      },
+      "keywords": {
+        "type": "keyword",
+        "index": true
+      },
+      "status": {
+        "type": "keyword",
+        "index": true
+      },
+      "tags": {
+        "type": "keyword",
+        "index": true
+      },
+      "numeric": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "double",
+            "index": true
+          },
+          "score": {
+            "type": "float",
+            "index": true
+          },
+          "priority": {
+            "type": "integer",
+            "index": true
+          }
+        }
+      },
+      "dates": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "date",
+            "format": "strict_date_optional_time||epoch_millis",
+            "index": true
+          },
+          "updated_at": {
+            "type": "date",
+            "format": "strict_date_optional_time||epoch_millis",
+            "index": true
+          },
+          "due_date": {
+            "type": "date",
+            "format": "strict_date_optional_time||epoch_millis",
+            "index": true
+          }
+        }
+      },
+      "facets": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "keyword",
+            "index": true
+          },
+          "category": {
+            "type": "keyword",
+            "index": true
+          },
+          "department": {
+            "type": "keyword",
+            "index": true
+          },
+          "tier": {
+            "type": "keyword",
+            "index": true
+          }
+        }
+      },
+      "joins_denorm": {
+        "type": "object",
+        "properties": {
+          "customer_name": {
+            "type": "text",
+            "analyzer": "search_analyzer",
+            "fields": {
+              "exact": {
+                "type": "keyword",
+                "normalizer": "lowercase"
+              }
+            }
+          },
+          "account_tier": {
+            "type": "keyword",
+            "index": true
+          },
+          "owner_email": {
+            "type": "keyword",
+            "index": false
+          },
+          "parent_account": {
+            "type": "keyword",
+            "index": true
+          }
+        }
+      },
+      "_acl": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "keyword",
+            "index": true
+          },
+          "roles": {
+            "type": "keyword",
+            "index": true
+          },
+          "groups": {
+            "type": "keyword",
+            "index": true
+          }
+        }
+      },
+      "_routing": {
+        "type": "keyword",
+        "index": false
+      },
+      "_timestamp": {
+        "type": "date",
+        "format": "strict_date_optional_time||epoch_millis",
+        "index": false
+      }
+    }
+  }
+}

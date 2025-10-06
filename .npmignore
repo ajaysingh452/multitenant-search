@@ -1,0 +1,87 @@
+# Source files (we only publish compiled lib/ directory)
+src/
+tsconfig*.json
+*.ts
+
+# Development and testing files
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js
+test-*.js
+integration-example.js
+
+# Build artifacts we don't need in npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Development configuration
+.env
+.env.local
+.env.*.local
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker files (not needed for npm package)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Kubernetes files
+k8s/
+*.yaml
+*.yml
+
+# Documentation that's not needed in package
+docs/
+IMPLEMENTATION_*.md
+INTEGRATION_*.md
+SUCCESS.md
+QUICKSTART.md
+*COMPLETE.md
+
+# Scripts and development tools
+scripts/
+integration/
+*.sh
+*.ps1
+
+# Demo and example files
+demo.js
+quick-test.js
+simple-server.js
+
+# Logs
+logs/
+*.log
+
+# API and route files (only core package components needed)
+api/
+routes/
+services/
+utils/
+types/
+
+# Package template (not needed in published package)
+package-template.json
+
+# Coverage and test reports
+coverage/
+.nyc_output/
+.coverage/

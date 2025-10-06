@@ -1,0 +1,163 @@
+{
+  "name": "search-docs",
+  "fields": [
+    {
+      "name": "tenant_id",
+      "type": "string",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "id",
+      "type": "string",
+      "facet": false,
+      "index": false
+    },
+    {
+      "name": "entity",
+      "type": "string",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "facet": false,
+      "index": true,
+      "sort": true
+    },
+    {
+      "name": "body",
+      "type": "string",
+      "facet": false,
+      "index": true,
+      "sort": false
+    },
+    {
+      "name": "keywords",
+      "type": "string[]",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "tags",
+      "type": "string[]",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "numeric.amount",
+      "type": "float",
+      "facet": true,
+      "index": true,
+      "sort": true
+    },
+    {
+      "name": "numeric.score",
+      "type": "float",
+      "facet": true,
+      "index": true,
+      "sort": true
+    },
+    {
+      "name": "numeric.priority",
+      "type": "int32",
+      "facet": true,
+      "index": true,
+      "sort": true
+    },
+    {
+      "name": "dates.created_at",
+      "type": "int64",
+      "facet": true,
+      "index": true,
+      "sort": true
+    },
+    {
+      "name": "dates.updated_at",
+      "type": "int64",
+      "facet": true,
+      "index": true,
+      "sort": true
+    },
+    {
+      "name": "dates.due_date",
+      "type": "int64",
+      "facet": true,
+      "index": true,
+      "sort": true,
+      "optional": true
+    },
+    {
+      "name": "facets.region",
+      "type": "string",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "facets.category",
+      "type": "string",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "facets.department",
+      "type": "string",
+      "facet": true,
+      "index": true,
+      "optional": true
+    },
+    {
+      "name": "facets.tier",
+      "type": "string",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "joins_denorm.customer_name",
+      "type": "string",
+      "facet": false,
+      "index": true,
+      "sort": true
+    },
+    {
+      "name": "joins_denorm.account_tier",
+      "type": "string",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "joins_denorm.parent_account",
+      "type": "string",
+      "facet": true,
+      "index": true,
+      "optional": true
+    },
+    {
+      "name": "_acl.owner",
+      "type": "string",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "_acl.roles",
+      "type": "string[]",
+      "facet": true,
+      "index": true
+    },
+    {
+      "name": "_acl.groups",
+      "type": "string[]",
+      "facet": true,
+      "index": true,
+      "optional": true
+    }
+  ],
+  "default_sorting_field": "dates.created_at"
+}

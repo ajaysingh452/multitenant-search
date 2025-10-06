@@ -1,0 +1,235 @@
+version: '3.8'
+
+services:
+  # Search Router
+  search-router:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+      - "9090:9090"  # Metrics
+    environment:
+      - NODE_ENV=development
+      - OPENSEARCH_URL=http://opensearch:9200
+      - TYPESENSE_URL=http://typesense:8108
+      - TYPESENSE_API_KEY=xyz123
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=debug
+    depends_on:
+      - opensearch
+      - typesense
+      - redis
+    volumes:
+      - ./src:/app
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - search-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OpenSearch Cluster (Single Node for Development)
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: opensearch
+    environment:
+      - cluster.name=search-cluster
+      - node.name=opensearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - "DISABLE_SECURITY_PLUGIN=true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+      - ./schemas/opensearch-mapping.json:/usr/share/opensearch/config/mapping.json:ro
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    networks:
+      - search-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Typesense
+  typesense:
+    image: typesense/typesense:0.25.2
+    container_name: typesense
+    environment:
+      - TYPESENSE_DATA_DIR=/data
+      - TYPESENSE_API_KEY=xyz123
+      - TYPESENSE_ENABLE_CORS=true
+      - TYPESENSE_LOG_LEVEL=info
+    volumes:
+      - typesense-data:/data
+    ports:
+      - "8108:8108"
+    networks:
+      - search-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8108/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - search-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL (Mock OLTP Database)
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_DB=searchdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres123
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./schemas/postgres-fallback.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./scripts/sample-data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - search-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kafka (for CDC simulation)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - search-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    networks:
+      - search-network
+
+  # Data Sync Service (Mock)
+  data-sync:
+    build:
+      context: ./src
+      dockerfile: Dockerfile.sync
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/searchdb
+      - KAFKA_BROKERS=kafka:9092
+      - OPENSEARCH_URL=http://opensearch:9200
+      - TYPESENSE_URL=http://typesense:8108
+      - TYPESENSE_API_KEY=xyz123
+    depends_on:
+      - postgres
+      - kafka
+      - opensearch
+      - typesense
+    networks:
+      - search-network
+    restart: unless-stopped
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - search-network
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    networks:
+      - search-network
+    depends_on:
+      - prometheus
+
+  # Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # HTTP collector
+    networks:
+      - search-network
+
+volumes:
+  opensearch-data:
+    driver: local
+  typesense-data:
+    driver: local
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  search-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

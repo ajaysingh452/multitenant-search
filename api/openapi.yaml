@@ -1,0 +1,450 @@
+openapi: 3.0.3
+info:
+  title: Multi-Tenant Search API
+  description: Lightning-fast search API with simple and complex query support
+  version: 1.0.0
+  contact:
+    name: Platform Team
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+  - url: https://staging-api.example.com/v1
+    description: Staging
+
+paths:
+  /search:
+    post:
+      summary: Unified Search
+      description: Execute simple, hybrid, or complex search queries with automatic routing
+      operationId: search
+      tags:
+        - Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+            examples:
+              simple_query:
+                summary: Simple entity lookup
+                value:
+                  q: null
+                  filters:
+                    entity: ["customer"]
+                    status: ["active"]
+                  sort: [{"field": "dates.created_at", "order": "desc"}]
+                  page: {"size": 20}
+              complex_query:
+                summary: Full-text with facets
+                value:
+                  q: "overdue invoice payment"
+                  filters:
+                    entity: ["order", "invoice"]
+                    facets.region: ["APAC", "EMEA"]
+                    numeric.amount: {"gte": 1000}
+                    dates.created_at: {"gte": "2024-01-01"}
+                  sort: [{"field": "numeric.amount", "order": "desc"}]
+                  page: {"size": 10}
+                  options:
+                    highlight: true
+                    suggest: true
+                    timeout_ms: 500
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /suggest:
+    post:
+      summary: Typeahead Suggestions
+      description: Fast prefix-based suggestions for autocomplete
+      operationId: suggest
+      tags:
+        - Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuggestRequest'
+      responses:
+        '200':
+          description: Suggestions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuggestResponse'
+
+  /explain:
+    post:
+      summary: Query Explanation
+      description: Returns the execution plan and performance metrics for a query
+      operationId: explain
+      tags:
+        - Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Query explanation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExplainResponse'
+
+  /admin/reindex:
+    post:
+      summary: Trigger Reindex
+      description: Start reindexing process for tenant data
+      operationId: reindex
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReindexRequest'
+      responses:
+        '202':
+          description: Reindex started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReindexResponse'
+        '403':
+          description: Insufficient permissions
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SearchRequest:
+      type: object
+      properties:
+        q:
+          type: string
+          nullable: true
+          description: Full-text search query
+          example: "overdue invoice"
+        filters:
+          type: object
+          description: Field-based filters
+          properties:
+            entity:
+              type: array
+              items:
+                type: string
+              example: ["customer", "order"]
+            status:
+              type: array
+              items:
+                type: string
+              example: ["open", "active"]
+            dates.created_at:
+              type: object
+              properties:
+                gte:
+                  type: string
+                  format: date
+                lte:
+                  type: string
+                  format: date
+            numeric.amount:
+              type: object
+              properties:
+                gte:
+                  type: number
+                lte:
+                  type: number
+          additionalProperties: true
+        sort:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              order:
+                type: string
+                enum: [asc, desc]
+          example: [{"field": "dates.created_at", "order": "desc"}]
+        select:
+          type: array
+          items:
+            type: string
+          description: Fields to return
+          example: ["id", "title", "joins_denorm.customer_name"]
+        page:
+          type: object
+          properties:
+            size:
+              type: integer
+              minimum: 1
+              maximum: 100
+              default: 20
+            cursor:
+              type: string
+              nullable: true
+              description: Pagination cursor for deep paging
+        options:
+          type: object
+          properties:
+            highlight:
+              type: boolean
+              default: false
+            suggest:
+              type: boolean
+              default: false
+            timeout_ms:
+              type: integer
+              minimum: 50
+              maximum: 2000
+              default: 700
+            strict:
+              type: boolean
+              default: false
+              description: Return error on partial results
+
+    SearchResponse:
+      type: object
+      properties:
+        hits:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'
+        total:
+          type: object
+          properties:
+            value:
+              type: integer
+            relation:
+              type: string
+              enum: [eq, gte]
+        page:
+          type: object
+          properties:
+            size:
+              type: integer
+            cursor:
+              type: string
+              nullable: true
+            has_more:
+              type: boolean
+        facets:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              buckets:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:
+                      type: string
+                    count:
+                      type: integer
+        suggestions:
+          type: array
+          items:
+            type: string
+        performance:
+          type: object
+          properties:
+            took_ms:
+              type: integer
+            engine:
+              type: string
+              enum: [simple, complex, hybrid]
+            cached:
+              type: boolean
+            partial:
+              type: boolean
+              description: Results may be incomplete due to timeout
+        debug:
+          type: object
+          properties:
+            query_classification:
+              type: string
+            cache_key:
+              type: string
+            tenant_routing:
+              type: string
+
+    SearchHit:
+      type: object
+      properties:
+        id:
+          type: string
+        source:
+          type: object
+          description: Selected fields from the document
+        score:
+          type: number
+          nullable: true
+        highlight:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    SuggestRequest:
+      type: object
+      required: [prefix]
+      properties:
+        prefix:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "cust"
+        entity:
+          type: array
+          items:
+            type: string
+          example: ["customer"]
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 10
+
+    SuggestResponse:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              score:
+                type: number
+              context:
+                type: object
+                properties:
+                  entity:
+                    type: string
+                  id:
+                    type: string
+        performance:
+          type: object
+          properties:
+            took_ms:
+              type: integer
+            cached:
+              type: boolean
+
+    ExplainResponse:
+      type: object
+      properties:
+        classification:
+          type: string
+          enum: [simple, complex, hybrid]
+        routing:
+          type: object
+          properties:
+            engine:
+              type: string
+            index:
+              type: string
+            reason:
+              type: string
+        estimated_cost:
+          type: object
+          properties:
+            complexity_score:
+              type: integer
+            expected_latency_ms:
+              type: integer
+        cache_strategy:
+          type: object
+          properties:
+            cacheable:
+              type: boolean
+            key:
+              type: string
+            ttl_seconds:
+              type: integer
+
+    ReindexRequest:
+      type: object
+      properties:
+        entities:
+          type: array
+          items:
+            type: string
+          description: Entity types to reindex (empty = all)
+        full:
+          type: boolean
+          default: false
+          description: Full rebuild vs incremental
+
+    ReindexResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+          enum: [started, queued]
+        estimated_duration_minutes:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+        request_id:
+          type: string
+
+security:
+  - BearerAuth: []

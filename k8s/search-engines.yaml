@@ -1,0 +1,352 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-cluster
+  namespace: search-system
+  labels:
+    app: opensearch
+    component: cluster
+spec:
+  serviceName: opensearch-headless
+  replicas: 3
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: opensearch
+  template:
+    metadata:
+      labels:
+        app: opensearch
+        component: cluster
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+      - name: configure-sysctl
+        image: busybox:1.35
+        command: ["sysctl", "-w", "vm.max_map_count=262144"]
+        securityContext:
+          privileged: true
+      containers:
+      - name: opensearch
+        image: opensearchproject/opensearch:2.11.0
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        env:
+        - name: cluster.name
+          value: "search-cluster"
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: discovery.seed_hosts
+          value: "opensearch-cluster-0.opensearch-headless,opensearch-cluster-1.opensearch-headless,opensearch-cluster-2.opensearch-headless"
+        - name: cluster.initial_master_nodes
+          value: "opensearch-cluster-0,opensearch-cluster-1,opensearch-cluster-2"
+        - name: bootstrap.memory_lock
+          value: "true"
+        - name: "OPENSEARCH_JAVA_OPTS"
+          value: "-Xms2g -Xmx2g"
+        - name: DISABLE_SECURITY_PLUGIN
+          value: "true"  # Disable for simplicity, enable in production
+        resources:
+          requests:
+            memory: 3Gi
+            cpu: 1000m
+          limits:
+            memory: 4Gi
+            cpu: 2000m
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/opensearch/data
+        - name: config
+          mountPath: /usr/share/opensearch/config/opensearch.yml
+          subPath: opensearch.yml
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health?local=true
+            port: 9200
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health?wait_for_status=yellow&timeout=5s
+            port: 9200
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+      volumes:
+      - name: config
+        configMap:
+          name: opensearch-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 100Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-cluster
+  namespace: search-system
+  labels:
+    app: opensearch
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 9200
+    targetPort: 9200
+  - name: transport
+    port: 9300
+    targetPort: 9300
+  selector:
+    app: opensearch
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-headless
+  namespace: search-system
+  labels:
+    app: opensearch
+spec:
+  clusterIP: None
+  ports:
+  - name: http
+    port: 9200
+    targetPort: 9200
+  - name: transport
+    port: 9300
+    targetPort: 9300
+  selector:
+    app: opensearch
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch-config
+  namespace: search-system
+data:
+  opensearch.yml: |
+    cluster.name: search-cluster
+    network.host: 0.0.0.0
+    http.port: 9200
+    transport.port: 9300
+    
+    # Discovery
+    discovery.type: zen
+    discovery.zen.minimum_master_nodes: 2
+    discovery.zen.ping.unicast.hosts:
+      - opensearch-cluster-0.opensearch-headless:9300
+      - opensearch-cluster-1.opensearch-headless:9300
+      - opensearch-cluster-2.opensearch-headless:9300
+    
+    # Memory
+    bootstrap.memory_lock: true
+    
+    # Indices
+    action.auto_create_index: true
+    action.destructive_requires_name: true
+    
+    # Performance
+    thread_pool.write.queue_size: 1000
+    thread_pool.search.queue_size: 2000
+    indices.memory.index_buffer_size: 20%
+    indices.memory.min_index_buffer_size: 96mb
+    
+    # Multi-tenancy optimizations
+    index.max_result_window: 50000
+    search.max_buckets: 100000
+    
+    # Disable security for demo (enable in production)
+    plugins.security.disabled: true
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: typesense
+  namespace: search-system
+  labels:
+    app: typesense
+    component: search-engine
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: typesense
+  template:
+    metadata:
+      labels:
+        app: typesense
+        component: search-engine
+    spec:
+      containers:
+      - name: typesense
+        image: typesense/typesense:0.25.2
+        ports:
+        - containerPort: 8108
+          name: http
+        env:
+        - name: TYPESENSE_DATA_DIR
+          value: "/data"
+        - name: TYPESENSE_API_KEY
+          valueFrom:
+            secretRef:
+              name: search-router-secrets
+              key: TYPESENSE_API_KEY
+        - name: TYPESENSE_ENABLE_CORS
+          value: "true"
+        - name: TYPESENSE_LOG_LEVEL
+          value: "info"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8108
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8108
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: data
+        emptyDir:
+          sizeLimit: 50Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: typesense
+  namespace: search-system
+  labels:
+    app: typesense
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8108
+    targetPort: 8108
+  selector:
+    app: typesense
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: search-system
+  labels:
+    app: redis
+    component: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        component: cache
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretRef:
+              name: search-router-secrets
+              key: REDIS_PASSWORD
+        command:
+        - redis-server
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        - --appendonly
+        - "yes"
+        - --maxmemory
+        - "1gb"
+        - --maxmemory-policy
+        - "allkeys-lru"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: data
+        emptyDir:
+          sizeLimit: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: search-system
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+  selector:
+    app: redis

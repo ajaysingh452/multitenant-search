@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/package-index.ts",
+    "src/client.ts",
+    "src/search-platform.ts",
+    "src/middleware.ts",
+    "src/sync.ts",
+    "src/factory.ts"
+  ],
+  "exclude": [
+    "src/index.ts",
+    "src/routes/**/*",
+    "src/services/**/*",
+    "src/utils/**/*",
+    "src/types/**/*",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}
