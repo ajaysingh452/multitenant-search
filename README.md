@@ -1,8 +1,8 @@
-# @apim/multitenant-search
+# @ajay.inpis/multitenant-search
 
-Production-grade multi-tenant search platform for APIM projects. Add lightning-fast search to your Express.js applications with minimal configuration.
+Production-grade multi-tenant search platform. Add lightning-fast search to your Express.js applications with minimal configuration.
 
-[![npm version](https://badge.fury.io/js/@apim%2Fmultitenant-search.svg)](https://www.npmjs.com/package/@apim/multitenant-search)
+[![npm version](https://badge.fury.io/js/@ajay.inpis%2Fmultitenant-search.svg)](https://www.npmjs.com/package/@ajay.inpis/multitenant-search)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
 
@@ -20,13 +20,13 @@ Production-grade multi-tenant search platform for APIM projects. Add lightning-f
 ### Installation
 
 ```bash
-npm install @apim/multitenant-search
+npm install @ajay.inpis/multitenant-search
 ```
 
 ### Basic Usage
 
 ```javascript
-const { SearchPlatform, SearchClient, SearchMiddleware } = require('@apim/multitenant-search');
+const { SearchPlatform, SearchClient, SearchMiddleware } = require('@ajay.inpis/multitenant-search');
 
 // 1. Start the search platform
 const platform = new SearchPlatform({ port: 3000 });
@@ -47,7 +47,7 @@ app.post('/api/users', search.syncOnCreate(), createUser);
 
 ```javascript
 import express from 'express';
-import { SearchMiddleware } from '@apim/multitenant-search';
+import { SearchMiddleware } from '@ajay.inpis/multitenant-search';
 
 const app = express();
 const searchMiddleware = new SearchMiddleware({
@@ -70,7 +70,7 @@ app.get('/api/autocomplete', searchMiddleware.autocomplete());
 ### SearchPlatform
 
 ```javascript
-const { SearchPlatform, createProductionConfig } = require('@apim/multitenant-search');
+const { SearchPlatform, createProductionConfig } = require('@ajay.inpis/multitenant-search');
 
 const platform = new SearchPlatform(createProductionConfig());
 await platform.start();
@@ -79,7 +79,7 @@ await platform.start();
 ### SearchClient
 
 ```javascript
-const { SearchClient } = require('@apim/multitenant-search');
+const { SearchClient } = require('@ajay.inpis/multitenant-search');
 
 const client = new SearchClient({
   baseUrl: 'http://localhost:3000',
@@ -96,7 +96,7 @@ const results = await client.search({
 ### SearchMiddleware
 
 ```javascript
-const { SearchMiddleware } = require('@apim/multitenant-search');
+const { SearchMiddleware } = require('@ajay.inpis/multitenant-search');
 
 const middleware = new SearchMiddleware({
   searchServiceUrl: 'http://localhost:3000'
@@ -176,7 +176,7 @@ const results = await client.search(searchQuery);
 
 ```javascript
 // pages/api/search.js
-import { SearchClient } from '@apim/multitenant-search';
+import { SearchClient } from '@ajay.inpis/multitenant-search';
 
 const client = new SearchClient({
   baseUrl: process.env.SEARCH_SERVICE_URL
@@ -235,7 +235,7 @@ import {
   SearchMiddleware,
   SearchQuery,
   SearchResponse 
-} from '@apim/multitenant-search';
+} from '@ajay.inpis/multitenant-search';
 
 const client: SearchClient = new SearchClient({
   baseUrl: 'http://localhost:3000'
@@ -249,10 +249,10 @@ const results: SearchResponse = await client.search({
 
 ## License
 
-MIT © APIM Product Development
+MIT
 
 ## Support
 
-- 📖 [Full Documentation](https://github.com/apim-org/multitenant-search)
-- 🐛 [Issues](https://github.com/apim-org/multitenant-search/issues)
-- 💬 [Discussions](https://github.com/apim-org/multitenant-search/discussions)
+- 📖 [Full Documentation](https://github.com/ajaysingh452/multitenant-search)
+- 🐛 [Issues](https://github.com/ajaysingh452/multitenant-search/issues)
+- 💬 [Discussions](https://github.com/ajaysingh452/multitenant-search/discussions)

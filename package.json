@@ -1,6 +1,6 @@
 {
-  "name": "@apim/multitenant-search",
-  "version": "1.0.0",
+  "name": "@ajay.inpis/multitenant-search",
+  "version": "1.0.3",
   "description": "Production-grade multi-tenant search platform.",
   "main": "lib/package-index.js",
   "types": "lib/package-index.d.ts",
@@ -27,12 +27,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/apim-org/multitenant-search.git"
+    "url": "git+https://github.com/ajaysingh452/multitenant-search.git"
   },
   "bugs": {
-    "url": "https://github.com/apim-org/multitenant-search/issues"
+    "url": "https://github.com/ajaysingh452/multitenant-search/issues"
   },
-  "homepage": "https://github.com/apim-org/multitenant-search#readme",
+  "homepage": "https://github.com/ajaysingh452/multitenant-search#readme",
   "files": [
     "lib/**/*",
     "schemas/**/*",
