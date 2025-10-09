@@ -1,6 +1,6 @@
 {
   "name": "@ajay.inpis/multitenant-search",
-  "version": "1.0.3",
+  "version": "1.0.7",
   "description": "Production-grade multi-tenant search platform.",
   "main": "lib/package-index.js",
   "types": "lib/package-index.d.ts",
